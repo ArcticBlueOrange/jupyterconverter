@@ -3,7 +3,7 @@
 # 
 
 # run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
-# In[47]:
+# In[2]:
 import os
 import sys
 import re
@@ -73,6 +73,8 @@ def convert_name(s):
         return s.replace('.ipynb', '.py')
     elif '.py' in s:
         return s.replace('.py', '.ipynb')
+    elif s == 'demo':
+        return s
     else:
         raise BaseException(
             f"{s} not recognized among the possible parameters - py or ipynb")
@@ -81,7 +83,7 @@ def convert_name(s):
 def p(*args, noise=2, **kwargs):
     if False:
         print(*args, **kwargs)
-# In[64]:
+# In[3]:
 def py2j(dir_input: str, dir_output: str):
     print(dir_input, '->', dir_output)
     with open(dir_input) as py:
@@ -172,26 +174,41 @@ def j2py(dir_input: str, dir_output: str):
     # TODO use the last parts of the script to build a valid shebang
 
 
-def demo():
-    j2py('j2py.ipynb', 'j2py.py')
-    py2j('j2py.py', 'j2py_test.ipynb')
+def demo(truename=False):
+    if truename:
+        j2py('j2py.ipynb', 'j2py.py')
+        py2j('j2py.py', 'j2py_demo.ipynb')
+    else:
+        j2py('j2py.ipynb', 'j2py_demo.py')
+        py2j('j2py_demo.py', 'j2py_demo.ipynb')
 
-demo()
-# In[40]:
+
+if False:
+    demo()
+# In[8]:
 def main():
-    if len(sys.argv) == 1 or re.search(r"ipy", sys.argv[0]):
+    print(TITLE)
+    print("Py2J conversion utility")
+
+    if len(sys.argv) == 1 or re.search(r"ipy(nb|kernel)", sys.argv[0]):
         print("Prompt launch")
         dir_input = input(
             "Please insert the input file name (must be a .py file)")
         dir_output = input(
             f"Please insert the name of the output file ({dir_input} by default)")
+        if dir_output == '':
+            dir_output = convert_name(dir_input)
     else:
         dir_input = sys.argv[1]
         if len(sys.argv) >= 2:
             dir_output = sys.argv[2]
         else:
             dir_output = convert_name(dir_input)
+
     assert dir_input and dir_output, "Missing input and/or output file names"
+    if dir_input == 'demo':
+        demo(True)
+
     if '.py' in dir_input and '.ipynb' in dir_output:
         py2j(dir_input, dir_output)
     elif '.ipynb' in dir_input and '.py' in dir_output:
