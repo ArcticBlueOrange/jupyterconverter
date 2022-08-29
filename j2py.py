@@ -27,22 +27,25 @@ ______  ___
 
 
 class reg():
-    start = r"(#.*!\/usr\/.*)|# coding.*|^$"
-    markdown = r"# (#.*)"
+    blank = r"^\s*$"
     code_separator = r"^# In\[([\d\s]*)\]:?.*"
-    blank = r"$\s*^"
+    markdown = r"# (#.*\n)"
+    scriptrow = r"^(\s*)(.+)$"
+    start = r"(#.*!\/usr\/.*)|# coding.*|^$"
 
 
 OPTIONS = {
     'noisy': True,
     'j2p': {
-        'keep_outputs': False,
-        'separate_markdown': True,
+        # TODO implement options for j2py
+        # 'keep_outputs': False, #NA
+        # 'separate_markdown': True, #NA
+        # 'keep_separators':True ,#NA
     },
     'p2j': {
-        'blank_separators': False, # use blank rows to separate cells
-        'in_separators': True, # use In[ ] to separate code
-        'markdown_separators': True, # use # #text to separate markdown
+        'blank_separators': False,  # use blank rows to separate cells
+        'in_separators': True,  # use In[ ] to separate code
+        'markdown_separators': True,  # use # #text to separate markdown
     }
 }
 
@@ -103,6 +106,150 @@ def p(*args, noise=2, **kwargs):
         print(*args, **kwargs)
 
 
+# windowselect()
+# In[3]:
+def py2j(dir_input: str, dir_output: str):
+    print(dir_input, '->', dir_output)
+    with open(dir_input) as py:
+        rows = py.readlines()
+        iterrows = iter(rows)
+        # print(rows)
+
+    split_cells = []
+    cur = deepcopy(script_cell_template)  # cur is a single Jupyter cell
+    cur['id'] = gen_id()
+    cur['cell_type'] = 'code'
+    cur['source'] = []
+    start = True
+    for row in iterrows:
+        # if a cell at the beginning contains only comments, transform it into a markdown cell
+        # ignore all beginning rows containing shebangs (for now, TODO improve using the info for the script itself?)
+        if start:
+            if re.match(reg.start, row):
+                continue
+            else:
+                start = False
+        # check if the rows contain the console separator '# In[int]:', or a markdown title separator '# #something'
+        space_sep = re.match(reg.blank, row)
+        # when a blank space is encountered, iterate next cells and evaluate whether the next one is a valid py script
+        if space_sep and OPTIONS['p2j']['blank_separators']:
+            temp = ['\n']
+            for temprow in iterrows:
+                if re.match(reg.blank, temprow):
+                    temp.append(temprow)
+                else:
+                    # TODO duplicate match definition. not soo good
+                    rowmatch = re.match(reg.scriptrow, temprow).groups()
+                    if rowmatch[0] == '':
+                        # all the past rows are just useless blank
+                        # a new cell is created here
+                        if cur['source']:
+                            split_cells.append(cur)
+                        cur = deepcopy(script_cell_template)
+                        cur['id'] = gen_id()
+                        cur['cell_type'] = 'code'
+                        # p(f'BLANK ROWS DELETION!')
+                    else:
+                        # this row and the previous ones are part of a function
+                        # better not break them
+                        ...
+                        # p(f'BLANK ROWS SAVED! {rowmatch[1:]}')
+
+                    cur['source'].extend(temp)
+                    break
+            row = temprow
+            # p(temprow)
+
+        cell_sep = re.match(reg.code_separator, row)
+        mkdn_sep = re.match(reg.markdown, row)
+        # when a cell separator is hit, split_cells gets updated and a new cell is generated
+        if cell_sep and OPTIONS['p2j']['in_separators']:
+            if cur['source']:
+                split_cells.append(cur)
+            cur = deepcopy(script_cell_template)
+            cur['id'] = gen_id()
+            cur['cell_type'] = 'code'
+            cur['execution_count'] = cell_sep[1] if cell_sep[1] != ' ' else None
+            continue
+        # when a markdown separator is hit, a new cell is generated only if the current one isn't already a md cell
+        elif mkdn_sep and cur['cell_type'] != 'markdown' and OPTIONS['p2j']['markdown_separators']:
+            if cur['source']:
+                split_cells.append(cur)
+            cur = deepcopy(script_cell_template)
+            cur['id'] = gen_id()
+            cur['cell_type'] = 'markdown'
+            cur['source'].append(mkdn_sep[1])
+            # p(repr(mkdn_sep[1]), repr(mkdn_sep), repr(row))
+        else:
+            if cur['cell_type'] != 'markdown':
+                cur['source'].append(row)
+            else:
+                try:
+                    cur['source'].append(re.match(r"# (.*)", row)[1])
+                except:
+                    cur['source'].append(row)
+            # p('--added', repr(row), end='\n')
+    else:
+        split_cells.append(cur)
+
+    # final json output
+    json_output = {
+        "cells": split_cells,
+        **notebook_info
+    }
+
+    with open(dir_output, 'w') as out_file:
+        out_file.write(json.dumps(json_output, indent=True))
+        p(f"saved to file {dir_output}")
+
+
+def j2py(dir_input: str, dir_output: str):
+    print(dir_input, '->', dir_output)
+    with open(dir_input) as nb:
+        nb_dict = json.loads(nb.read())
+    cells: list = nb_dict['cells']
+    cell_rows = []
+    # pprint(cells)
+    for cell in cells:
+        if cell['cell_type'] == 'code':
+            exec_count = cell.get('execution_count', None)
+            exec_count = exec_count if exec_count else ' '
+            cell_rows.append(f"# In[{exec_count}]:\n")
+
+            for row in cell.get('source', []):
+                cell_rows.append(fixrow(row))
+
+        else:
+            # p(f"appending noncode rows:")
+            # p(cell.get('source', []))
+            for row in cell.get('source', []):
+                cell_rows.append(f"# {fixrow(row)}")
+
+    with open(dir_output, 'w') as py_out:
+        py_out.write(''.join(cell_rows))
+
+    # TODO use the last parts of the script to build a valid shebang
+
+
+def demo(truename=False):
+    py2j('j2py.py', 'j2py_demo.ipynb')
+    j2py('j2py_demo.ipynb', 'j2py_demo.py')
+    for i in range(50):
+        py2j('j2py_demo.py', 'j2py_demo.ipynb')
+        j2py('j2py_demo.ipynb', 'j2py_demo.py')
+
+
+def fixrow(s):
+    '''add a newline at the end of a row, if missing'''
+    if s == '' or s is None:
+        return '\n'
+    if s[-1] != '\n':
+        return s + '\n'
+    return s
+
+
+def graphicsdemo():
+    ...
 # if True:
 #     import tkinter
 #     from tkinter import ttk
@@ -127,108 +274,9 @@ def p(*args, noise=2, **kwargs):
 #             initialvalue=convert_name(startfile))
 #         print(outputfile)
 #         return (startfile, outputfile)
-
-
-# windowselect()
-# In[3]:
-def py2j(dir_input: str, dir_output: str):
-    print(dir_input, '->', dir_output)
-    with open(dir_input) as py:
-        rows = py.readlines()
-        # print(rows)
-
-    split_cells = []
-    cur = deepcopy(script_cell_template)  # cur is a single Jupyter cell
-    cur['id'] = gen_id()
-    cur['cell_type'] = 'code'
-    cur['source'] = []
-    temp = []  # temp accumulates uncertain cells
-    start = True
-    for row in rows:
-        # if a cell at the beginning contains only comments, transform it into a markdown cell
-        # ignore all beginning rows containing shebangs (for now, TODO improve using the info for the script itself?)
-        if start:
-            if re.match(reg.start, row):
-                continue
-            else:
-                start = False
-        # check if the rows contain the console separator '# In[int]:', or a markdown title separator '# #something'
-        cell_sep = re.match(reg.code_separator, row) \
-            and OPTIONS['p2j']['in_separators']
-        mkdn_sep = re.match(reg.markdown, row) \
-            and OPTIONS['p2j']['markdown_separators']
-        space_sep = re.match(reg.blank) and OPTIONS['p2j']['blank_separators']
-        # when a cell separator is hit, split_cells gets updated and a new cell is generated
-        if cell_sep:
-            if cur['source']:
-                split_cells.append(cur)
-            cur = deepcopy(script_cell_template)
-            cur['id'] = gen_id()
-            cur['cell_type'] = 'code'
-            cur['execution_count'] = cell_sep[1] if cell_sep[1] != ' ' else None
-            continue
-        # when a markdown separator is hit, a new cell is generated only if the current one isn't already a markdown cell
-        elif mkdn_sep and cur['cell_type'] != 'markdown':
-            if cur['source']:
-                split_cells.append(cur)
-            cur = deepcopy(script_cell_template)
-            cur['id'] = gen_id()
-            cur['cell_type'] = 'markdown'
-            cur['source'].append(mkdn_sep[1])
-        else:
-            if cur['cell_type'] != 'markdown':
-                cur['source'].append(row)
-            else:
-                try:
-                    cur['source'].append(re.match(r"# (.*)", row)[1])
-                except:
-                    cur['source'].append(row)
-            p('--added', repr(row), end='\n')
-    else:
-        split_cells.append(cur)
-
-    # final json output
-    json_output = {
-        "cells": split_cells,
-        **notebook_info
-    }
-
-    with open(dir_output, 'w') as out_file:
-        out_file.write(json.dumps(json_output, indent=True))
-        p(f"saved to file {dir_output}")
-
-
-def j2py(dir_input: str, dir_output: str):
-    print(dir_input, '->', dir_output)
-    with open(dir_input) as nb:
-        nb_dict = json.loads(nb.read())
-    cells: list = nb_dict['cells']
-    cell_rows = []
-    # pprint(cells)
-    for cell in cells:
-        cell_type = cell['cell_type']
-        if cell_type == 'code':
-            exec_count = cell.get('execution_count', ' ')
-            cell_rows.append(f"# In[{exec_count}]:\n")
-            for row in cell.get('source', []):
-                cell_rows.append(row)
-        else:
-            for row in cell.get('source', []):
-                cell_rows.append(f"# {row}\n")
-    with open(dir_output, 'w') as py_out:
-        py_out.write(''.join(cell_rows))
-
-    # TODO use the last parts of the script to build a valid shebang
-
-
-def demo(truename=False):
-    py2j('j2py.py', 'j2py_demo.ipynb')
-    j2py('j2py.ipynb', 'j2py_demo.py')
-
-
-# if True:
-#     demo()
 # In[4]:
+
+
 # In[13]:
 def main():
     print(TITLE)
