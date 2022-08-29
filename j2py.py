@@ -1,9 +1,9 @@
 # ## P2J - Python 2 Jupyter utility script
 
-# 
+#
 
 # run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
-# In[2]:
+# In[1]:
 import os
 import sys
 import re
@@ -14,6 +14,7 @@ from pprint import pprint
 from copy import deepcopy
 from operator import xor
 from pathlib import Path
+from types import SimpleNamespace
 
 TITLE = r"""
 ______  ___ 
@@ -24,8 +25,25 @@ ______  ___
 \_|  \____/ 
 """
 
+
+class reg():
+    start = r"(#.*!\/usr\/.*)|# coding.*|^$"
+    markdown = r"# (#.*)"
+    code_separator = r"^# In\[([\d\s]*)\]:?.*"
+    blank = r"$\s*^"
+
+
 OPTIONS = {
-    'keep_outputs': False,
+    'noisy': True,
+    'j2p': {
+        'keep_outputs': False,
+        'separate_markdown': True,
+    },
+    'p2j': {
+        'blank_separators': False, # use blank rows to separate cells
+        'in_separators': True, # use In[ ] to separate code
+        'markdown_separators': True, # use # #text to separate markdown
+    }
 }
 
 script_cell_template = {
@@ -81,34 +99,65 @@ def convert_name(s):
 
 
 def p(*args, noise=2, **kwargs):
-    if False:
+    if OPTIONS['noisy']:
         print(*args, **kwargs)
+
+
+# if True:
+#     import tkinter
+#     from tkinter import ttk
+#     from tkinter.filedialog import askopenfilename
+#     from tkinter.simpledialog import askstring
+
+
+# def windowselect():
+#     # Store the path to the selected file
+#     tkinter.Tk().withdraw()  # Do not show root window
+#     start_folder = Path('.')
+#     startfile = askopenfilename(initialdir=start_folder)
+
+#     if startfile == '':
+#         print('You did not select any file.')
+#         input('Press enter to close...')
+#         # sys.exit()
+#     else:
+#         print('Source selected: ' + startfile)
+#         outputfile = askstring(
+#             "Output file name",
+#             initialvalue=convert_name(startfile))
+#         print(outputfile)
+#         return (startfile, outputfile)
+
+
+# windowselect()
 # In[3]:
 def py2j(dir_input: str, dir_output: str):
     print(dir_input, '->', dir_output)
     with open(dir_input) as py:
         rows = py.readlines()
-    reg_markdown = r"# (#.*)"
-    reg_start = r"(#.*!\/usr\/.*)|# coding.*|^$"
-    reg_separator = r"^# In\[([\d\s]*)\]:?.*"
+        # print(rows)
 
     split_cells = []
     cur = deepcopy(script_cell_template)  # cur is a single Jupyter cell
     cur['id'] = gen_id()
     cur['cell_type'] = 'code'
     cur['source'] = []
+    temp = []  # temp accumulates uncertain cells
     start = True
     for row in rows:
         # if a cell at the beginning contains only comments, transform it into a markdown cell
         # ignore all beginning rows containing shebangs (for now, TODO improve using the info for the script itself?)
         if start:
-            if re.match(reg_start, row):
+            if re.match(reg.start, row):
                 continue
             else:
                 start = False
         # check if the rows contain the console separator '# In[int]:', or a markdown title separator '# #something'
-        cell_sep = re.match(reg_separator, row)
-        mkdn_sep = re.match(reg_markdown, row)
+        cell_sep = re.match(reg.code_separator, row) \
+            and OPTIONS['p2j']['in_separators']
+        mkdn_sep = re.match(reg.markdown, row) \
+            and OPTIONS['p2j']['markdown_separators']
+        space_sep = re.match(reg.blank) and OPTIONS['p2j']['blank_separators']
         # when a cell separator is hit, split_cells gets updated and a new cell is generated
         if cell_sep:
             if cur['source']:
@@ -134,7 +183,7 @@ def py2j(dir_input: str, dir_output: str):
                     cur['source'].append(re.match(r"# (.*)", row)[1])
                 except:
                     cur['source'].append(row)
-            p('--added', row, end='')
+            p('--added', repr(row), end='\n')
     else:
         split_cells.append(cur)
 
@@ -152,9 +201,7 @@ def py2j(dir_input: str, dir_output: str):
 def j2py(dir_input: str, dir_output: str):
     print(dir_input, '->', dir_output)
     with open(dir_input) as nb:
-        # print(nb.read())
         nb_dict = json.loads(nb.read())
-    # use the "cells" content to build a valid script sequence
     cells: list = nb_dict['cells']
     cell_rows = []
     # pprint(cells)
@@ -175,27 +222,26 @@ def j2py(dir_input: str, dir_output: str):
 
 
 def demo(truename=False):
-    if truename:
-        j2py('j2py.ipynb', 'j2py.py')
-        py2j('j2py.py', 'j2py_demo.ipynb')
-    else:
-        j2py('j2py.ipynb', 'j2py_demo.py')
-        py2j('j2py_demo.py', 'j2py_demo.ipynb')
+    py2j('j2py.py', 'j2py_demo.ipynb')
+    j2py('j2py.ipynb', 'j2py_demo.py')
 
 
-if False:
-    demo()
-# In[8]:
+# if True:
+#     demo()
+# In[4]:
+# In[13]:
 def main():
     print(TITLE)
-    print("Py2J conversion utility")
+    print("P2J conversion utility")
+    demo()
+    return
 
     if len(sys.argv) == 1 or re.search(r"ipy(nb|kernel)", sys.argv[0]):
         print("Prompt launch")
         dir_input = input(
-            "Please insert the input file name (must be a .py file)")
+            "Please insert the input file name (must be a .py or .ipynb file) ")
         dir_output = input(
-            f"Please insert the name of the output file ({dir_input} by default)")
+            f"Please insert the name of the output file ({convert_name(dir_input)} by default) ")
         if dir_output == '':
             dir_output = convert_name(dir_input)
     else:
