@@ -4,6 +4,7 @@
 
 # run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
 # In[1]:
+from asyncio import windows_events
 import os
 import sys
 import re
@@ -248,32 +249,34 @@ def fixrow(s):
     return s
 
 
-def graphicsdemo():
-    ...
-# if True:
-#     import tkinter
-#     from tkinter import ttk
-#     from tkinter.filedialog import askopenfilename
-#     from tkinter.simpledialog import askstring
+def windowselect():
+    import tkinter
+    from tkinter import ttk
+    from tkinter.filedialog import askopenfilename
+    from tkinter.simpledialog import askstring
+    # Store the path to the selected file
+    tkinter.Tk().withdraw()  # Do not show root window
+    start_folder = Path('.')
+    startfile = askopenfilename(initialdir=start_folder)
 
+    if startfile == '':
+        print('You did not select any file.')
+        input('Press enter to close...')
+        # sys.exit()
+    else:
+        print('Source selected: ' + startfile)
+        outputfile = askstring(
+            "Output file name",
+            prompt=f"Select the name for the output file",
+            initialvalue=convert_name(startfile))
+        print(outputfile)
+        if re.search(r"\.ipynb", startfile):
+            j2py(startfile, outputfile)
+        else:
+            py2j(startfile, outputfile)
+        # return (startfile, outputfile)
+    print("Done")
 
-# def windowselect():
-#     # Store the path to the selected file
-#     tkinter.Tk().withdraw()  # Do not show root window
-#     start_folder = Path('.')
-#     startfile = askopenfilename(initialdir=start_folder)
-
-#     if startfile == '':
-#         print('You did not select any file.')
-#         input('Press enter to close...')
-#         # sys.exit()
-#     else:
-#         print('Source selected: ' + startfile)
-#         outputfile = askstring(
-#             "Output file name",
-#             initialvalue=convert_name(startfile))
-#         print(outputfile)
-#         return (startfile, outputfile)
 # In[4]:
 
 
@@ -281,7 +284,8 @@ def graphicsdemo():
 def main():
     print(TITLE)
     print("P2J conversion utility")
-    demo()
+    # demo()
+    windowselect()
     return
 
     if len(sys.argv) == 1 or re.search(r"ipy(nb|kernel)", sys.argv[0]):
