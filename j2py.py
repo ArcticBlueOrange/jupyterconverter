@@ -1,19 +1,19 @@
 # ## P2J - Python 2 Jupyter utility script
-
 #
 
 # run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
 # In[1]:
 from asyncio import windows_events
+from cgitb import text
+from imp import init_builtin
 import os
 import sys
 import re
 import datetime as dt
 import random as rnd
 import json
-from pprint import pprint
 from copy import deepcopy
-from operator import xor
+from operator import contains, xor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -82,6 +82,12 @@ notebook_info = {
     "nbformat": 4,
     "nbformat_minor": 5
 }
+
+
+def pairwise(ls):
+    it = iter(ls)
+    for el in it:
+        yield el, next(it)
 
 
 def gen_id(chars: str = "abcdefghijklmnopqrstuvwxyz0123456789",
@@ -210,7 +216,6 @@ def j2py(dir_input: str, dir_output: str):
         nb_dict = json.loads(nb.read())
     cells: list = nb_dict['cells']
     cell_rows = []
-    # pprint(cells)
     for cell in cells:
         if cell['cell_type'] == 'code':
             exec_count = cell.get('execution_count', None)
@@ -232,6 +237,18 @@ def j2py(dir_input: str, dir_output: str):
     # TODO use the last parts of the script to build a valid shebang
 
 
+def runconversion(dir_input: str, dir_output: str):
+    if dir_input.endswith('.py') and dir_output.endswith('.ipynb'):
+        j2py(dir_input, dir_output)
+    elif dir_input.endswith('.ipynb') and dir_output.endswith('.py'):
+        py2j(dir_input, dir_output)
+    elif dir_input != '' and dir_output == '':
+        runconversion(dir_input, convert_name(dir_input))
+    else:
+        raise Exception(
+            f"Invalid names for conversion: {dir_input} and {dir_output}")
+
+
 def demo(truename=False):
     py2j('j2py.py', 'j2py_demo.ipynb')
     j2py('j2py_demo.ipynb', 'j2py_demo.py')
@@ -249,13 +266,13 @@ def fixrow(s):
     return s
 
 
-def windowselect():
-    import tkinter
+def simplewindowselect():
+    import tkinter as tk
     from tkinter import ttk
     from tkinter.filedialog import askopenfilename
     from tkinter.simpledialog import askstring
     # Store the path to the selected file
-    tkinter.Tk().withdraw()  # Do not show root window
+    tk.Tk().withdraw()  # Do not show root window as tk
     start_folder = Path('.')
     startfile = askopenfilename(initialdir=start_folder)
 
@@ -277,42 +294,122 @@ def windowselect():
         # return (startfile, outputfile)
     print("Done")
 
+
+def guimode():
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter.filedialog import askopenfilename
+    # from tkinter.simpledialog import askstring
+
+    # configure UI
+    gui = tk.Tk()
+    gui.resizable(True, True)
+    gui.title("P2J")
+    gui.rowconfigure(0, weight=10)
+    gui.columnconfigure(0, weight=10)
+
+    def openfile(stringvar: tk.StringVar):
+        # global lastdir
+        out = askopenfilename(initialdir='.')
+        print(out)
+        # test = Path(out)
+        # lastdir = test.parent
+        stringvar.set(out)
+        print(inputvalue == outputvalue)
+        print(inputvalue.get() == outputvalue.get())
+        print(inputvalue.get(), "---", outputvalue.get())
+
+    # input
+    inputframe = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
+    inputframe.grid(column=0, row=0)
+    inputvalue = tk.StringVar()
+    inputtext = ttk.Entry(inputframe, width=30, textvariable=inputvalue)
+    inputtext.grid(column=1, row=0)
+    inputtext.focus()
+    inputbutton = ttk.Button(inputframe, text="Input file",
+                             command=lambda: openfile(inputvalue))
+    inputbutton.grid(column=0, row=0)
+
+    # output
+    outputframe = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
+    outputframe.grid(column=0, row=1)
+    outputvalue = tk.StringVar()
+    outputtext = ttk.Entry(outputframe, width=30, textvariable=inputvalue)
+    outputtext.grid(column=1, row=1)
+    outputtext.focus()
+    outputbutton = ttk.Button(outputframe, text="Output file",
+                              command=lambda: openfile(outputvalue))
+    outputbutton.grid(column=0, row=1)
+
+    runbutton = ttk.Button(gui, text="Convert",
+                           command=lambda: runconversion(inputvalue.get(), outputvalue.get()))
+    runbutton.grid(column=0, row=2)
+
+    gui.mainloop()
+    print("Gui closed")
+
+
 # In[4]:
 
 
-# In[13]:
-def main():
+def print_help():
     print(TITLE)
     print("P2J conversion utility")
-    # demo()
-    windowselect()
-    return
+    print("Instructions for use")
 
-    if len(sys.argv) == 1 or re.search(r"ipy(nb|kernel)", sys.argv[0]):
-        print("Prompt launch")
-        dir_input = input(
-            "Please insert the input file name (must be a .py or .ipynb file) ")
-        dir_output = input(
-            f"Please insert the name of the output file ({convert_name(dir_input)} by default) ")
-        if dir_output == '':
-            dir_output = convert_name(dir_input)
-    else:
-        dir_input = sys.argv[1]
-        if len(sys.argv) >= 2:
-            dir_output = sys.argv[2]
+# In[13]:
+
+
+def main():
+    if len(sys.argv) == 1:
+        print("Window select called")
+        # simplewindowselect()
+        guimode()
+        return
+
+    # parse arguments
+    iargs = iter(sys.argv[1:])
+    dargs = {'files': []}
+    for a in iargs:
+        print(a)
+        if a in ['-h', '--h']:
+            print_help()
+            return
+        elif a == '-w':
+            windowselect()
+            return
+        elif a == '-m':
+            # MANUAL MODE
+            print(TITLE)
+            print('Manual Mode')
+            dir_input = input(
+                "Please insert the input file name (must be a .py or .ipynb file).")
+            dir_output = input(
+                f"Please insert the name of the output file (same name by default).")
+            if dir_output == '':
+                dir_output = convert_name(dir_input)
+            dargs['files'] = [dir_input, dir_output]
+        elif a in ['--use-blanks']:
+            OPTIONS['p2j']['blank_separators'] = True
+        elif a in ['--ignore-ins']:
+            OPTIONS['p2j']['in_separators'] = True
+        elif a in ['--no-markdown']:
+            OPTIONS['p2j']['markdown_separators'] = True
         else:
-            dir_output = convert_name(dir_input)
+            dargs['files'].append(a)
 
-    assert dir_input and dir_output, "Missing input and/or output file names"
-    if dir_input == 'demo':
-        demo(True)
+    print(dargs)
 
-    if '.py' in dir_input and '.ipynb' in dir_output:
-        py2j(dir_input, dir_output)
-    elif '.ipynb' in dir_input and '.py' in dir_output:
-        j2py(dir_input, dir_output)
+    assert len(dargs['files']) > 0, "You must select at 1 file to convert"
 
-    p(f"{dir_input}->{dir_output}")
+    if len(dargs['files']) & 1 == 1:  # evenize the file arguments
+        dargs['files'].append(convert_name(dargs[-1]))
+
+    for inputfile, outputfile in pairwise(dargs['files']):
+        if '.py' in inputfile and '.ipynb' in outputfile:
+            py2j(inputfile, outputfile)
+        elif '.ipynb' in inputfile and '.py' in outputfile:
+            j2py(inputfile, outputfile)
 
 
 if __name__ == '__main__':
