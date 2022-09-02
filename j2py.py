@@ -3,9 +3,6 @@
 
 # run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
 # In[1]:
-from asyncio import windows_events
-from cgitb import text
-from imp import init_builtin
 import os
 import sys
 import re
@@ -113,7 +110,6 @@ def p(*args, noise=2, **kwargs):
         print(*args, **kwargs)
 
 
-# windowselect()
 # In[3]:
 def py2j(dir_input: str, dir_output: str):
     print(dir_input, '->', dir_output)
@@ -226,8 +222,6 @@ def j2py(dir_input: str, dir_output: str):
                 cell_rows.append(fixrow(row))
 
         else:
-            # p(f"appending noncode rows:")
-            # p(cell.get('source', []))
             for row in cell.get('source', []):
                 cell_rows.append(f"# {fixrow(row)}")
 
@@ -238,10 +232,13 @@ def j2py(dir_input: str, dir_output: str):
 
 
 def runconversion(dir_input: str, dir_output: str):
+    print(f"catchall function for conversion")
+    print(f"{dir_input} --> {dir_output}")
+
     if dir_input.endswith('.py') and dir_output.endswith('.ipynb'):
-        j2py(dir_input, dir_output)
-    elif dir_input.endswith('.ipynb') and dir_output.endswith('.py'):
         py2j(dir_input, dir_output)
+    elif dir_input.endswith('.ipynb') and dir_output.endswith('.py'):
+        j2py(dir_input, dir_output)
     elif dir_input != '' and dir_output == '':
         runconversion(dir_input, convert_name(dir_input))
     else:
@@ -279,7 +276,6 @@ def simplewindowselect():
     if startfile == '':
         print('You did not select any file.')
         input('Press enter to close...')
-        # sys.exit()
     else:
         print('Source selected: ' + startfile)
         outputfile = askstring(
@@ -287,19 +283,15 @@ def simplewindowselect():
             prompt=f"Select the name for the output file",
             initialvalue=convert_name(startfile))
         print(outputfile)
-        if re.search(r"\.ipynb", startfile):
-            j2py(startfile, outputfile)
-        else:
-            py2j(startfile, outputfile)
-        # return (startfile, outputfile)
+        runconversion(startfile, outputfile)
+
     print("Done")
 
 
 def guimode():
     import tkinter as tk
     from tkinter import ttk
-    from tkinter.filedialog import askopenfilename
-    # from tkinter.simpledialog import askstring
+    from tkinter.filedialog import askopenfilename, askdirectory
 
     # configure UI
     gui = tk.Tk()
@@ -308,45 +300,44 @@ def guimode():
     gui.rowconfigure(0, weight=10)
     gui.columnconfigure(0, weight=10)
 
-    def openfile(stringvar: tk.StringVar):
-        # global lastdir
-        out = askopenfilename(initialdir='.')
-        print(out)
-        # test = Path(out)
-        # lastdir = test.parent
-        stringvar.set(out)
-        print(inputvalue == outputvalue)
-        print(inputvalue.get() == outputvalue.get())
-        print(inputvalue.get(), "---", outputvalue.get())
-
     # input
     inputframe = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
-    inputframe.grid(column=0, row=0)
-    inputvalue = tk.StringVar()
+    inputframe.grid(column=0, row=0, sticky="w")
+    inputvalue = tk.StringVar(master=inputframe)
     inputtext = ttk.Entry(inputframe, width=30, textvariable=inputvalue)
     inputtext.grid(column=1, row=0)
-    inputtext.focus()
     inputbutton = ttk.Button(inputframe, text="Input file",
-                             command=lambda: openfile(inputvalue))
+                             command=lambda: openfile('in'))
     inputbutton.grid(column=0, row=0)
 
     # output
     outputframe = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
-    outputframe.grid(column=0, row=1)
-    outputvalue = tk.StringVar()
-    outputtext = ttk.Entry(outputframe, width=30, textvariable=inputvalue)
+    outputframe.grid(column=0, row=1, sticky='w')
+    outputvalue = tk.StringVar(master=outputframe)
+    outputtext = ttk.Entry(outputframe, width=30, textvariable=outputvalue)
     outputtext.grid(column=1, row=1)
-    outputtext.focus()
     outputbutton = ttk.Button(outputframe, text="Output file",
-                              command=lambda: openfile(outputvalue))
+                              command=lambda: openfile('out'))
     outputbutton.grid(column=0, row=1)
 
     runbutton = ttk.Button(gui, text="Convert",
                            command=lambda: runconversion(inputvalue.get(), outputvalue.get()))
     runbutton.grid(column=0, row=2)
 
+    def openfile(var='in'):
+        # TODO HORRIBLE METHOD
+        if var == 'in':
+            out = Path(askopenfilename(initialdir='.'))
+            inputvalue.set(out)
+            outputvalue.set(convert_name(str(out)))
+        else:
+            out = Path(askdirectory(initialdir='.'))
+            outputvalue.set(
+                out.parent / convert_name(str(Path(inputvalue.get()).name)))
+
     gui.mainloop()
     print("Gui closed")
+    print("END")
 
 
 # In[4]:
@@ -376,7 +367,8 @@ def main():
             print_help()
             return
         elif a == '-w':
-            windowselect()
+            # simplewindowselect()
+            guimode()
             return
         elif a == '-m':
             # MANUAL MODE
@@ -406,10 +398,7 @@ def main():
         dargs['files'].append(convert_name(dargs[-1]))
 
     for inputfile, outputfile in pairwise(dargs['files']):
-        if '.py' in inputfile and '.ipynb' in outputfile:
-            py2j(inputfile, outputfile)
-        elif '.ipynb' in inputfile and '.py' in outputfile:
-            j2py(inputfile, outputfile)
+        runconversion(inputfile, outputfile)
 
 
 if __name__ == '__main__':
