@@ -11,7 +11,6 @@
 
 # run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
 # In[1]:
-import os
 import sys
 import re
 import random as rnd
@@ -34,13 +33,14 @@ class reg():
     blank = r"^\s*$"
     code_separator = r"^# In\[([\d\s]*)\]:?.*"
     markdown = r"# (#.*\n)"
+    simplecomment = r"# (.*)"
     scriptrow = r"^(\s*)(.+)$"
     start = r"(#.*!\/usr\/.*)|# coding.*|^$"
 
 
 OPTIONS = {
     'noisy': True,
-    'confirm_overwrite': False,
+    'overwrite': False,
     'j2p': {
         # TODO implement options for j2py
         'keep_outputs': False,  # NA
@@ -112,18 +112,18 @@ def convert_name(s):
             f"{s} not recognized among the possible parameters - py or ipynb")
 
 
-def p(*args, noise=2, **kwargs):
+def p(*args, **kwargs):
     if OPTIONS['noisy']:
         print(*args, **kwargs)
 
 
 # In[3]:
-def py2j(dir_input: str, dir_output: str):
-    print(dir_input, '->', dir_output)
+def py2j(dir_input: str, dir_output: str) -> str:
+    p(dir_input, '->', dir_output)
     with open(dir_input) as py:
         rows = py.readlines()
         iterrows = iter(rows)
-        # print(rows)
+        # p(rows)
 
     split_cells = []
     cur = deepcopy(script_cell_template)  # cur is a single Jupyter cell
@@ -195,7 +195,7 @@ def py2j(dir_input: str, dir_output: str):
                 cur['source'].append(row)
             else:
                 try:
-                    cur['source'].append(re.match(r"# (.*)", row)[1])
+                    cur['source'].append(re.match(reg.simplecomment, row)[1])
                 except:
                     cur['source'].append(row)
             # p('--added', repr(row), end='\n')
@@ -208,13 +208,13 @@ def py2j(dir_input: str, dir_output: str):
         **notebook_info
     }
 
-    with open(dir_output, 'w') as out_file:
+    with open(dir_output, 'w' if OPTIONS['overwrite'] else 'x') as out_file:
         out_file.write(json.dumps(json_output, indent=True))
         p(f"saved to file {dir_output}")
 
 
-def j2py(dir_input: str, dir_output: str):
-    print(dir_input, '->', dir_output)
+def j2py(dir_input: str, dir_output: str) -> str:
+    p(dir_input, '->', dir_output)
     with open(dir_input) as nb:
         nb_dict = json.loads(nb.read())
     cells: list = nb_dict['cells']
@@ -232,13 +232,13 @@ def j2py(dir_input: str, dir_output: str):
             for row in cell.get('source', []):
                 cell_rows.append(f"# {fixrow(row)}")
 
-    with open(dir_output, 'w') as py_out:
+    with open(dir_output, 'w' if OPTIONS['overwrite'] else 'x') as py_out:
         py_out.write(''.join(cell_rows))
 
 
-def runconversion(dir_input: str, dir_output: str):
-    print(f"Script conversion started")
-    print(f"{dir_input} --> {dir_output}")
+def runconversion(dir_input: str, dir_output: str) -> str:
+    p(f"Script conversion started")
+    p(f"{repr(dir_input)} --> {repr(dir_output)}")
 
     if dir_input.endswith('.py') and dir_output.endswith('.ipynb'):
         py2j(dir_input, dir_output)
@@ -248,7 +248,7 @@ def runconversion(dir_input: str, dir_output: str):
         runconversion(dir_input, convert_name(dir_input))
     else:
         raise Exception(
-            f"Invalid names for conversion: {dir_input} and {dir_output}")
+            f"Invalid names for conversion: '{dir_input}' and '{dir_output}'")
 
 
 def demo(truename=False):
@@ -281,18 +281,18 @@ def simplewindowselect():
     startfile = askopenfilename(initialdir=start_folder)
 
     if startfile == '':
-        print('You did not select any file.')
+        p('You did not select any file.')
         input('Press enter to close...')
     else:
-        print('Source selected: ' + startfile)
+        p('Source selected: ' + startfile)
         outputfile = askstring(
             "Output file name",
             prompt=f"Select the name for the output file",
             initialvalue=convert_name(startfile))
-        print(outputfile)
+        p(outputfile)
         runconversion(startfile, outputfile)
 
-    print("Done")
+    p("Done")
 
 
 def guimode():
@@ -318,7 +318,6 @@ def guimode():
     inputbutton = ttk.Button(inputframe, text="Input file",
                              command=lambda: openfile('in'))
     inputbutton.grid(column=0, row=0)
-
     # output
     outputvalue = tk.StringVar(master=inputframe)
     outputtext = ttk.Entry(inputframe, width=50,
@@ -327,33 +326,28 @@ def guimode():
     outputbutton = ttk.Button(inputframe, text="Output file",
                               command=lambda: openfile('out'))
     outputbutton.grid(column=0, row=1)
-
+    # run button
     runbutton = ttk.Button(inputframe, text="Convert",
-                           command=lambda: runconversion(inputvalue.get(),
-                                                         outputvalue.get()))
+                           command=lambda: inner_run())
     runbutton.grid(column=0, row=2, sticky="nw")
+    # status information
+    status = tk.Label(inputframe, height=1, width=50,
+                      text="Status Information")
+    status.grid(column=0, row=3, columnspan=2, sticky='nw')
 
-    # option buttons
+    # option buttons - global, p2j and j2p
+    overwrite = tk.BooleanVar(value=OPTIONS['overwrite'])
+    tk.Checkbutton(inputframe, text="Overwrite if file exists",
+                   variable=overwrite,
+                   onvalue=True, offvalue=False).grid(column=1, row=2, sticky='nw')
+    overwrite.trace_add(mode='write',
+                        callback=lambda x, y, z: refresh_options())
+
+    p2jboxes = {}
     p2joptions = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
     p2joptions.grid(column=1, row=0, sticky='nw', rowspan=3)
     tk.Label(p2joptions, text="Py->J Options").grid(row=0,
                                                     column=0, sticky='nw')
-    p2jboxes = {}
-    j2poptions = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
-    j2poptions.grid(column=2, row=0, sticky='nw', rowspan=3)
-    tk.Label(j2poptions, text="J->Py Options").grid(row=0,
-                                                    column=0, sticky='nw')
-    j2pboxes = {}
-
-    def refresh_options(var, index, mode):
-        """Callback for option editing"""
-        print("OPTIONS EDITED")
-        for k, v in p2jboxes.items():
-            OPTIONS['p2j'][k] = p2jboxes[k].get()
-        for k, v in j2pboxes.items():
-            OPTIONS['j2p'][k] = j2pboxes[k].get()
-        print(OPTIONS)
-
     for i, k in enumerate(OPTIONS['p2j'].keys()):
         bol = tk.BooleanVar(value=OPTIONS['p2j'][k])
         tk.Checkbutton(p2joptions,
@@ -363,8 +357,14 @@ def guimode():
                        offvalue=False,
                        ).grid(column=0, row=i+1, sticky="nw")
         bol.trace_add(mode='write',
-                      callback=refresh_options)
+                      callback=lambda x, y, z: refresh_options())
         p2jboxes[k] = bol
+
+    j2pboxes = {}
+    j2poptions = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
+    j2poptions.grid(column=2, row=0, sticky='nw', rowspan=3)
+    tk.Label(j2poptions, text="J->Py Options").grid(row=0,
+                                                    column=0, sticky='nw')
     for i, k in enumerate(OPTIONS['j2p'].keys()):
         bol = tk.BooleanVar(value=OPTIONS['j2p'][k])
         tk.Checkbutton(j2poptions,
@@ -375,23 +375,48 @@ def guimode():
                        state=tk.DISABLED,
                        ).grid(column=0, row=i+1, sticky="nw")
         bol.trace_add(mode='write',
-                      callback=refresh_options)
+                      callback=lambda x, y, z: refresh_options())
         j2pboxes[k] = bol
+
+    # inner functions
+    def refresh_options():
+        """Callback for option editing"""
+        p("OPTIONS EDITED")
+        for k, v in p2jboxes.items():
+            OPTIONS['p2j'][k] = p2jboxes[k].get()
+        for k, v in j2pboxes.items():
+            OPTIONS['j2p'][k] = j2pboxes[k].get()
+        OPTIONS['overwrite'] = overwrite.get()
+        print(OPTIONS)
 
     def openfile(var='in'):
         # TODO REWRITE HORRIBLE METHOD
-        if var == 'in':
-            out = Path(askopenfilename(initialdir='.'))
-            inputvalue.set(out)
-            outputvalue.set(convert_name(str(out)))
-        else:
-            out = Path(askdirectory(initialdir='.'))
-            outputvalue.set(
-                out.parent / convert_name(str(Path(inputvalue.get()).name)))
+        try:
+            if var == 'in':
+                out = Path(askopenfilename(initialdir='.'))
+                inputvalue.set(out)
+                outputvalue.set(convert_name(str(out)))
+                status.config(text=f"Input set")
+            else:
+                out = Path(
+                    askdirectory(initialdir='.')) / convert_name(
+                        str(Path(inputvalue.get()).name))
+                outputvalue.set(out)
+                status.config(text=f"Output set")
+        except Exception as e:
+            status.config(text=f"Error: {e}")
+
+    def inner_run():
+        try:
+            fin = inputtext.get()
+            fout = outputtext.get()
+            output = runconversion(fin, fout)
+            status.config(text=output)
+        except Exception as e:
+            status.config(text=f"Error: {e}")
 
     gui.mainloop()
-    print("Gui closed")
-    print("END")
+    p("Gui closed")
 
 
 # In[4]:
@@ -407,7 +432,7 @@ def print_help():
 
 def main():
     if len(sys.argv) == 1:
-        print("Window select called")
+        p("Window select called")
         # simplewindowselect()
         guimode()
         return
@@ -416,7 +441,7 @@ def main():
     iargs = iter(sys.argv[1:])
     dargs = {'files': []}
     for a in iargs:
-        print(a)
+        p(a)
         if a in ['-h', '--h']:
             print_help()
             return
@@ -426,8 +451,8 @@ def main():
             return
         elif a == '-m':
             # MANUAL MODE
-            print(TITLE)
-            print('Manual Mode')
+            p(TITLE)
+            p('Manual Mode')
             dir_input = input(
                 "Please insert the input file name (must be a .py or .ipynb file).")
             dir_output = input(
@@ -441,10 +466,12 @@ def main():
             OPTIONS['p2j']['in_separators'] = True
         elif a in ['--no-markdown']:
             OPTIONS['p2j']['markdown_separators'] = True
+        elif a in ['--overwrite']:
+            OPTIONS['overwrite'] = True
         else:
             dargs['files'].append(a)
 
-    print(dargs)
+    p(dargs)
 
     assert len(dargs['files']) > 0, "You must select at 1 file to convert"
 
