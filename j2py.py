@@ -1,30 +1,36 @@
 # ## P2J - Python 2 Jupyter utility script
-#
+# ## TODO LIST
+# ### j2py
+# - add options
+# - build shebangs from python version info
+# - improve matches
+# ### GUI
+# -   add icon
+# -   add options
+# -   add confirmation button if a file is going to be overwritten
 
 # run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
 # In[1]:
 import os
 import sys
 import re
-import datetime as dt
 import random as rnd
 import json
 from copy import deepcopy
-from operator import contains, xor
 from pathlib import Path
-from types import SimpleNamespace
 
 TITLE = r"""
-______  ___ 
+______  ___
 | ___ \|_  |
 | |_/ /  | |
 |  __/2  | |
 | |  /\__/ /
-\_|  \____/ 
+\_|  \____/
 """
 
 
 class reg():
+    """Store here all the regexes used in the script"""
     blank = r"^\s*$"
     code_separator = r"^# In\[([\d\s]*)\]:?.*"
     markdown = r"# (#.*\n)"
@@ -34,11 +40,12 @@ class reg():
 
 OPTIONS = {
     'noisy': True,
+    'confirm_overwrite': False,
     'j2p': {
         # TODO implement options for j2py
-        # 'keep_outputs': False, #NA
-        # 'separate_markdown': True, #NA
-        # 'keep_separators':True ,#NA
+        'keep_outputs': False,  # NA
+        'separate_markdown': True,  # NA
+        'keep_separators': True,  # NA
     },
     'p2j': {
         'blank_separators': False,  # use blank rows to separate cells
@@ -228,11 +235,9 @@ def j2py(dir_input: str, dir_output: str):
     with open(dir_output, 'w') as py_out:
         py_out.write(''.join(cell_rows))
 
-    # TODO use the last parts of the script to build a valid shebang
-
 
 def runconversion(dir_input: str, dir_output: str):
-    print(f"catchall function for conversion")
+    print(f"Script conversion started")
     print(f"{dir_input} --> {dir_output}")
 
     if dir_input.endswith('.py') and dir_output.endswith('.ipynb'):
@@ -247,6 +252,7 @@ def runconversion(dir_input: str, dir_output: str):
 
 
 def demo(truename=False):
+    # TODO deprecate
     py2j('j2py.py', 'j2py_demo.ipynb')
     j2py('j2py_demo.ipynb', 'j2py_demo.py')
     for i in range(50):
@@ -264,6 +270,7 @@ def fixrow(s):
 
 
 def simplewindowselect():
+    # TODO deprecate
     import tkinter as tk
     from tkinter import ttk
     from tkinter.filedialog import askopenfilename
@@ -301,31 +308,78 @@ def guimode():
     gui.columnconfigure(0, weight=10)
 
     # input
-    inputframe = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
-    inputframe.grid(column=0, row=0, sticky="w")
+    inputframe = ttk.Frame(gui, height=10, width=10,
+                           padding="3 3 20 20")
+    inputframe.grid(column=0, row=0, sticky="nw")
     inputvalue = tk.StringVar(master=inputframe)
-    inputtext = ttk.Entry(inputframe, width=30, textvariable=inputvalue)
-    inputtext.grid(column=1, row=0)
+    inputtext = ttk.Entry(inputframe, width=50,
+                          textvariable=inputvalue)
+    inputtext.grid(column=1, row=0, sticky='nwe')
     inputbutton = ttk.Button(inputframe, text="Input file",
                              command=lambda: openfile('in'))
     inputbutton.grid(column=0, row=0)
 
     # output
-    outputframe = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
-    outputframe.grid(column=0, row=1, sticky='w')
-    outputvalue = tk.StringVar(master=outputframe)
-    outputtext = ttk.Entry(outputframe, width=30, textvariable=outputvalue)
-    outputtext.grid(column=1, row=1)
-    outputbutton = ttk.Button(outputframe, text="Output file",
+    outputvalue = tk.StringVar(master=inputframe)
+    outputtext = ttk.Entry(inputframe, width=50,
+                           textvariable=outputvalue)
+    outputtext.grid(column=1, row=1, sticky='nwe')
+    outputbutton = ttk.Button(inputframe, text="Output file",
                               command=lambda: openfile('out'))
     outputbutton.grid(column=0, row=1)
 
-    runbutton = ttk.Button(gui, text="Convert",
-                           command=lambda: runconversion(inputvalue.get(), outputvalue.get()))
-    runbutton.grid(column=0, row=2)
+    runbutton = ttk.Button(inputframe, text="Convert",
+                           command=lambda: runconversion(inputvalue.get(),
+                                                         outputvalue.get()))
+    runbutton.grid(column=0, row=2, sticky="nw")
+
+    # option buttons
+    p2joptions = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
+    p2joptions.grid(column=1, row=0, sticky='nw', rowspan=3)
+    tk.Label(p2joptions, text="Py->J Options").grid(row=0,
+                                                    column=0, sticky='nw')
+    p2jboxes = {}
+    j2poptions = ttk.Frame(gui, height=10, width=10, padding="3 3 20 20")
+    j2poptions.grid(column=2, row=0, sticky='nw', rowspan=3)
+    tk.Label(j2poptions, text="J->Py Options").grid(row=0,
+                                                    column=0, sticky='nw')
+    j2pboxes = {}
+
+    def refresh_options(var, index, mode):
+        """Callback for option editing"""
+        print("OPTIONS EDITED")
+        for k, v in p2jboxes.items():
+            OPTIONS['p2j'][k] = p2jboxes[k].get()
+        for k, v in j2pboxes.items():
+            OPTIONS['j2p'][k] = j2pboxes[k].get()
+        print(OPTIONS)
+
+    for i, k in enumerate(OPTIONS['p2j'].keys()):
+        bol = tk.BooleanVar(value=OPTIONS['p2j'][k])
+        tk.Checkbutton(p2joptions,
+                       text=k,
+                       variable=bol,
+                       onvalue=True,
+                       offvalue=False,
+                       ).grid(column=0, row=i+1, sticky="nw")
+        bol.trace_add(mode='write',
+                      callback=refresh_options)
+        p2jboxes[k] = bol
+    for i, k in enumerate(OPTIONS['j2p'].keys()):
+        bol = tk.BooleanVar(value=OPTIONS['j2p'][k])
+        tk.Checkbutton(j2poptions,
+                       text=k,
+                       variable=bol,
+                       onvalue=True,
+                       offvalue=False,
+                       state=tk.DISABLED,
+                       ).grid(column=0, row=i+1, sticky="nw")
+        bol.trace_add(mode='write',
+                      callback=refresh_options)
+        j2pboxes[k] = bol
 
     def openfile(var='in'):
-        # TODO HORRIBLE METHOD
+        # TODO REWRITE HORRIBLE METHOD
         if var == 'in':
             out = Path(askopenfilename(initialdir='.'))
             inputvalue.set(out)
