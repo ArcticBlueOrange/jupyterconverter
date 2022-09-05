@@ -1,25 +1,15 @@
-______  ___
-| ___ \|_  |
-| |_/ /  | |
-|  __/2  | |
-| |  /\__/ /
-\_|  \____/
+# P2J conversion utility
 
-P2J conversion utility
-
+### Description
 ----------------------------------------------------------------------
 This simple script provides a cli and gui for converting .py <--> .ipynb files.  
 I made this because I wasn't fully satisfied by the current options available on PyPI.  
 
-
-
-The GUI contains all the options available in the text interface and have the same defaults enabled, although some command names may change.  
-
-
+### Instructions
 ----------------------------------------------------------------------
+#### USAGE OPTIONS (Command Line)
 
-USAGE OPTIONS (Command Line)
-
+```
 j2py.py [input_file] [output_file] -w -h -m --use-blanks --ignore-ins --no-markdown --overwrite
  (no arguments) or -w (windowed)
         Will open the gui mode (suggested)
@@ -39,3 +29,6 @@ j2py.py [input_file] [output_file] -w -h -m --use-blanks --ignore-ins --no-markd
   Other options:  
     --overwrite
         Will OVERWRITE the destination file if already in the system
+```
+
+The GUI contains all the options available in the text interface and have the same defaults enabled, although some command names may change.  
