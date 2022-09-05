@@ -42,9 +42,9 @@ OPTIONS = {
     'noisy': True,
     'overwrite': False,
     'j2p': {
-        # TODO implement options for j2py
+        'delete_markdown': False,  # NA
+        'delete_raw': True,  # NA
         'keep_outputs': False,  # NA
-        'separate_markdown': True,  # NA
         'keep_separators': True,  # NA
     },
     'p2j': {
@@ -88,6 +88,11 @@ notebook_info = {
 }
 
 
+def p(*args, **kwargs):
+    if OPTIONS['noisy']:
+        print(*args, **kwargs)
+
+
 def pairwise(ls):
     it = iter(ls)
     for el in it:
@@ -95,8 +100,8 @@ def pairwise(ls):
 
 
 def gen_id(chars: str = "abcdefghijklmnopqrstuvwxyz0123456789",
-           lens: list = [8, 4, 4, 4, 12],
-           sep: str = "-"):
+           lens: list = [8, 4, 4, 4, 12], sep: str = "-"):
+    """Not sure if it actually works"""
     return sep.join("".join(rnd.choice(chars) for i in range(l)) for l in lens)
 
 
@@ -105,16 +110,18 @@ def convert_name(s):
         return s.replace('.ipynb', '.py')
     elif '.py' in s:
         return s.replace('.py', '.ipynb')
-    elif s == 'demo':
-        return s
     else:
         raise BaseException(
-            f"{s} not recognized among the possible parameters - py or ipynb")
+            f"{s} not recognized among the possible file types - py or ipynb")
 
 
-def p(*args, **kwargs):
-    if OPTIONS['noisy']:
-        print(*args, **kwargs)
+def fixrow(s):
+    '''add a newline at the end of a row, if missing'''
+    if s == '' or s is None:
+        return '\n'
+    if s[-1] != '\n':
+        return s + '\n'
+    return s
 
 
 # In[3]:
@@ -123,7 +130,6 @@ def py2j(dir_input: str, dir_output: str) -> str:
     with open(dir_input) as py:
         rows = py.readlines()
         iterrows = iter(rows)
-        # p(rows)
 
     split_cells = []
     cur = deepcopy(script_cell_template)  # cur is a single Jupyter cell
@@ -244,7 +250,7 @@ def runconversion(dir_input: str, dir_output: str) -> str:
         py2j(dir_input, dir_output)
     elif dir_input.endswith('.ipynb') and dir_output.endswith('.py'):
         j2py(dir_input, dir_output)
-    elif dir_input != '' and dir_output == '':
+    elif re.search(r"(\.ipynb$|\.py$)") and dir_output == '':
         runconversion(dir_input, convert_name(dir_input))
     else:
         raise Exception(
@@ -258,15 +264,6 @@ def demo(truename=False):
     for i in range(50):
         py2j('j2py_demo.py', 'j2py_demo.ipynb')
         j2py('j2py_demo.ipynb', 'j2py_demo.py')
-
-
-def fixrow(s):
-    '''add a newline at the end of a row, if missing'''
-    if s == '' or s is None:
-        return '\n'
-    if s[-1] != '\n':
-        return s + '\n'
-    return s
 
 
 def simplewindowselect():
@@ -425,7 +422,27 @@ def guimode():
 def print_help():
     print(TITLE)
     print("P2J conversion utility")
-    print("Instructions for use")
+    print("Usage options")
+    print(
+        "j2py.py [input_file] [output_file] -w -h -m --use-blanks --ignore-ins --no-markdown --overwrite ")
+    print(" (no arguments) or -w (windowed)")
+    print("\tWill open the gui mode (suggested)")
+    print(" -h --help")
+    print("\tPrints this message and exits")
+    print(" -m")
+    print("\tAllows user to insert manually the input and output file")
+    print("  Jupyter --> Python options:")
+    print("--use-blanks")
+    print("\tSPLIT code whenever there are blank lines")
+    print("--ignore-ins")
+    print("\tIGNORE the In[#] separators when")
+    print("--no-markdown")
+    print("\tWill NOT try to convert markdown snippets to code")
+    print("  Python --> Jupyter options")
+    print("Other options")
+    print("  --overwrite")
+    print("\tWill OVERWRITE the destination file if already in the system")
+    print("")
 
 # In[13]:
 
@@ -442,7 +459,7 @@ def main():
     dargs = {'files': []}
     for a in iargs:
         p(a)
-        if a in ['-h', '--h']:
+        if a in ['-h', '--help']:
             print_help()
             return
         elif a == '-w':
@@ -463,9 +480,9 @@ def main():
         elif a in ['--use-blanks']:
             OPTIONS['p2j']['blank_separators'] = True
         elif a in ['--ignore-ins']:
-            OPTIONS['p2j']['in_separators'] = True
+            OPTIONS['p2j']['in_separators'] = False
         elif a in ['--no-markdown']:
-            OPTIONS['p2j']['markdown_separators'] = True
+            OPTIONS['p2j']['markdown_separators'] = False
         elif a in ['--overwrite']:
             OPTIONS['overwrite'] = True
         else:
