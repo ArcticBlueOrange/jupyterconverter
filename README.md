@@ -11,6 +11,7 @@ I made this because I wasn't fully satisfied by the current options available on
 
 ```
 j2py.py [input_file] [output_file] -w -h -m --use-blanks --ignore-ins --no-markdown --overwrite
+
  (no arguments) or -w (windowed)
         Will open the gui mode (suggested)
  -h --help
