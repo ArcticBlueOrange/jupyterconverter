@@ -19,12 +19,14 @@ from copy import deepcopy
 from pathlib import Path
 
 TITLE = r"""
-______  ___
-| ___ \|_  |
-| |_/ /  | |
-|  __/2  | |
-| |  /\__/ /
-\_|  \____/
+   ___  ______      
+  |_  | | ___ \     
+    | | | |_/ /   _ 
+    | |2|  __/ | | |
+/\__/ / | |  | |_| |
+\____/  \_|   \__, |
+               __/ |
+              |___/ 
 """
 
 
@@ -300,7 +302,7 @@ def guimode():
     # configure UI
     gui = tk.Tk()
     gui.resizable(True, True)
-    gui.title("P2J")
+    gui.title("J2Py")
     gui.rowconfigure(0, weight=10)
     gui.columnconfigure(0, weight=10)
 
@@ -421,7 +423,7 @@ def guimode():
 
 def print_help():
     print(TITLE)
-    print("P2J conversion utility")
+    print("J2Py conversion utility")
     print("Usage options")
     print(
         "j2py.py [input_file] [output_file] -w -h -m --use-blanks --ignore-ins --no-markdown --overwrite ")
