@@ -1,8 +1,9 @@
-.ipynb_checkpoints/*
+.ipynb_checkpoints
+__pycache__
+icon
+dist
+venv
 
+*.ipynb
 *test*
 *demo*
-*.ipynb
-icon/*
-dist/*
-venv/*
