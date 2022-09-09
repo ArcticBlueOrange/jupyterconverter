@@ -2,6 +2,7 @@
 
 *test*
 *demo*
-j2py.ipynb
+*.ipynb
 icon/*
 dist/*
+venv/*
