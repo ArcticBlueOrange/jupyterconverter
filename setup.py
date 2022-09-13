@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='j2py',
-    version='0.3.3.1',
+    version='0.3.3.5',
     license='gpl-3.0',
     author="Alberto Brandolini",
     author_email='brando1411@gmail.com',
