@@ -44,10 +44,10 @@ OPTIONS = {
     'noisy': True,
     'overwrite': False,
     'j2p': {
-        'delete_markdown': False,  # NA
-        'delete_raw': True,  # NA
-        'keep_outputs': False,  # NA
-        'keep_separators': True,  # NA
+        'delete_markdown': False,  # ignore markdown
+        # 'delete_raw': True,  # NA
+        # 'keep_outputs': False,  # NA
+        'keep_separators': True,  # No paste separators
     },
     'p2j': {
         'blank_separators': False,  # use blank rows to separate cells
@@ -124,6 +124,7 @@ def fixrow(s):
     if s[-1] != '\n':
         return s + '\n'
     return s
+    # return re.sub('\n*$', '\n', s) # not working always
 
 
 # In[3]:
@@ -231,14 +232,16 @@ def j2py(dir_input: str, dir_output: str) -> str:
         if cell['cell_type'] == 'code':
             exec_count = cell.get('execution_count', None)
             exec_count = exec_count if exec_count else ' '
-            cell_rows.append(f"# In[{exec_count}]:\n")
-
+            if OPTIONS['j2p']['keep_separators']:
+                cell_rows.append(f"# In[{exec_count}]:\n")
             for row in cell.get('source', []):
                 cell_rows.append(fixrow(row))
-
+        elif cell['cell_type'] in ('markdown', 'raw'):
+            if not OPTIONS['j2p']['delete_markdown']:
+                for row in cell.get('source', []):
+                    cell_rows.append(f"# {fixrow(row)}")
         else:
-            for row in cell.get('source', []):
-                cell_rows.append(f"# {fixrow(row)}")
+            raise BaseException(f'Unrecognized cell type: {cell["cell_type"]}')
 
     with open(dir_output, 'w' if OPTIONS['overwrite'] else 'x') as py_out:
         py_out.write(''.join(cell_rows))
@@ -371,7 +374,6 @@ def guimode():
                        variable=bol,
                        onvalue=True,
                        offvalue=False,
-                       state=tk.DISABLED,
                        ).grid(column=0, row=i+1, sticky="nw")
         bol.trace_add(mode='write',
                       callback=lambda x, y, z: refresh_options())
@@ -441,6 +443,10 @@ def print_help():
     print("--no-markdown")
     print("\tWill NOT try to convert markdown snippets to code")
     print("  Python --> Jupyter options")
+    print("--delete-markdown")
+    print("\tIgnore markdown and raw cells")
+    print("--remove-separators")
+    print("\tDoes not paste separators (makes a cleaner output)")
     print("Other options")
     print("  --overwrite")
     print("\tWill OVERWRITE the destination file if already in the system")
@@ -479,12 +485,19 @@ def main():
             if dir_output == '':
                 dir_output = convert_name(dir_input)
             dargs['files'] = [dir_input, dir_output]
+        # py2j options
         elif a in ['--use-blanks']:
             OPTIONS['p2j']['blank_separators'] = True
         elif a in ['--ignore-ins']:
             OPTIONS['p2j']['in_separators'] = False
         elif a in ['--no-markdown']:
             OPTIONS['p2j']['markdown_separators'] = False
+        # j2py options
+        elif a in ['--delete-markdown']:
+            OPTIONS['delete_markdown'] = True
+        elif a in ['--remove-separators']:
+            OPTIONS['keep_separators'] = False
+        # other options
         elif a in ['--overwrite']:
             OPTIONS['overwrite'] = True
         else:
