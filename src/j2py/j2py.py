@@ -38,6 +38,8 @@ class reg():
     simplecomment = r"# (.*)"
     scriptrow = r"^(\s*)(.+)$"
     start = r"(#.*!\/usr\/.*)|# coding.*|^$"
+    # arg_ext = r"--[\w\-]+"
+    # arg_short = r"-(\w+)"
 
 
 OPTIONS = {
@@ -160,25 +162,17 @@ def py2j(dir_input: str, dir_output: str) -> str:
                     # TODO duplicate match definition. not soo good
                     rowmatch = re.match(reg.scriptrow, temprow).groups()
                     if rowmatch[0] == '':
-                        # all the past rows are just useless blank
+                        # all the past rows are just blank and not part of a func/class
                         # a new cell is created here
                         if cur['source']:
                             split_cells.append(cur)
                         cur = deepcopy(script_cell_template)
                         cur['id'] = gen_id()
                         cur['cell_type'] = 'code'
-                        # p(f'BLANK ROWS DELETION!')
-                    else:
-                        # this row and the previous ones are part of a function
-                        # better not break them
-                        ...
-                        # p(f'BLANK ROWS SAVED! {rowmatch[1:]}')
-
                     cur['source'].extend(temp)
                     break
             row = temprow
-            # p(temprow)
-
+            # p(temprow
         cell_sep = re.match(reg.code_separator, row)
         mkdn_sep = re.match(reg.markdown, row)
         # when a cell separator is hit, split_cells gets updated and a new cell is generated
@@ -461,18 +455,18 @@ def print_help():
     print("\tPrints this message and exits")
     print(" -m")
     print("\tAllows user to insert manually the input and output file")
-    print("  Jupyter --> Python options:")
+    print("  Python --> Jupyter options:")
     print("--use-blanks")
     print("\tSPLIT code whenever there are blank lines")
     print("--ignore-ins")
     print("\tIGNORE the In[#] separators when")
     print("--no-markdown")
-    print("\tWill NOT try to convert markdown snippets to code")
-    print("  Python --> Jupyter options")
+    print("\tWill ignore double hashtag rows (usually marking Markdown data)")
+    print("  Jupyter --> Python options")
     print("--delete-markdown")
-    print("\tIgnore markdown and raw cells")
+    print("\tIGNORE markdown and raw cells")
     print("--remove-separators")
-    print("\tDoes not paste separators (makes a cleaner output)")
+    print("\tDoes NOT PASTE SEPARATORS (makes a cleaner output)")
     print("Other options")
     print("  --overwrite")
     print("\tWill OVERWRITE the destination file if already in the system")
@@ -493,6 +487,8 @@ def main():
     dargs = {'files': []}
     for a in iargs:
         p(a)
+        # match_ext = re.match(reg.arg_ext, a)
+        # match_short =re.match(reg.arg_short, a)
         if a in ['-h', '--help']:
             print_help()
             return
@@ -520,9 +516,9 @@ def main():
             OPTIONS['p2j']['markdown_separators'] = False
         # j2py options
         elif a in ['--delete-markdown']:
-            OPTIONS['delete_markdown'] = True
+            OPTIONS['j2py']['delete_markdown'] = True
         elif a in ['--remove-separators']:
-            OPTIONS['keep_separators'] = False
+            OPTIONS['j2py']['keep_separators'] = False
         # other options
         elif a in ['--overwrite']:
             OPTIONS['overwrite'] = True
@@ -531,7 +527,8 @@ def main():
 
     p(dargs)
 
-    assert len(dargs['files']) > 0, "You must select at 1 file to convert"
+    assert len(dargs['files']
+               ) > 0, "You must select at least 1 file to convert"
 
     if len(dargs['files']) & 1 == 1:  # evenize the file arguments
         dargs['files'].append(convert_name(dargs[-1]))
