@@ -1,0 +1,7 @@
+0.3.3.5 - 2022-09-14
+GUI
+    errors shown fully
+    better status messages when inserting input
+other
+    function savefile handling handling the writing
+

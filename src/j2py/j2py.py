@@ -217,9 +217,7 @@ def py2j(dir_input: str, dir_output: str) -> str:
         **notebook_info
     }
 
-    with open(dir_output, 'w' if OPTIONS['overwrite'] else 'x') as out_file:
-        out_file.write(json.dumps(json_output, indent=True))
-        p(f"saved to file {dir_output}")
+    return savefile(dir_output, json.dumps(json_output, indent=True))
 
 
 def j2py(dir_input: str, dir_output: str) -> str:
@@ -243,8 +241,7 @@ def j2py(dir_input: str, dir_output: str) -> str:
         else:
             raise BaseException(f'Unrecognized cell type: {cell["cell_type"]}')
 
-    with open(dir_output, 'w' if OPTIONS['overwrite'] else 'x') as py_out:
-        py_out.write(''.join(cell_rows))
+    return savefile(dir_output, ''.join(cell_rows))
 
 
 def runconversion(dir_input: str, dir_output: str) -> str:
@@ -252,14 +249,37 @@ def runconversion(dir_input: str, dir_output: str) -> str:
     p(f"{repr(dir_input)} --> {repr(dir_output)}")
 
     if dir_input.endswith('.py') and dir_output.endswith('.ipynb'):
-        py2j(dir_input, dir_output)
+        out = py2j(dir_input, dir_output)
     elif dir_input.endswith('.ipynb') and dir_output.endswith('.py'):
-        j2py(dir_input, dir_output)
-    elif re.search(r"(\.ipynb$|\.py$)") and dir_output == '':
-        runconversion(dir_input, convert_name(dir_input))
+        out = j2py(dir_input, dir_output)
+    elif re.search(r"(\.ipynb$|\.py$)", dir_input) and dir_output == '':
+        out = runconversion(dir_input, convert_name(dir_input))
     else:
         raise Exception(
             f"Invalid names for conversion: '{dir_input}' and '{dir_output}'")
+    return "File converted" if out else "File not converted"
+
+
+def savefile(dir_output, filecontent):
+    """Returns
+    True if the file was saved
+    False in case the file the file exists and overwrite disabled"""
+    opt = 'w' if OPTIONS['overwrite'] else 'x'
+    with open(dir_output, opt) as out_file:
+        out_file.write(filecontent)
+        p(f"saved to file {dir_output}")
+    return True
+
+
+def breakstr(s, cols=45):
+    return '\n'.join(s[i:i+cols] for i in range(0, len(s), cols))
+
+
+# def samedata(f0: str, f1: str) -> bool:
+#     """Checks the content of two strings, returning true if they are not updated"""
+#     h0 = md5(f0.encode()).hexdigest()
+#     h1 = md5(f1.encode()).hexdigest()
+#     return h0 == h1
 
 
 def demo(truename=False):
@@ -333,9 +353,9 @@ def guimode():
                            command=lambda: inner_run())
     runbutton.grid(column=0, row=2, sticky="nw")
     # status information
-    status = tk.Label(inputframe, height=1, width=50,
-                      text="Status Information")
-    status.grid(column=0, row=3, columnspan=2, sticky='nw')
+    status = tk.Label(inputframe, width=50,
+                      text="Status Information", anchor='w')
+    status.grid(column=0, row=3, columnspan=2, sticky='ew')
 
     # option buttons - global, p2j and j2p
     overwrite = tk.BooleanVar(value=OPTIONS['overwrite'])
@@ -397,7 +417,10 @@ def guimode():
                 out = Path(askopenfilename(initialdir='.'))
                 inputvalue.set(out)
                 outputvalue.set(convert_name(str(out)))
-                status.config(text=f"Input set")
+                if re.match(r".*\.py$", str(out)):
+                    status.config(text=f"Py -> J")
+                else:
+                    status.config(text=f"J -> Py")
             else:
                 out = Path(
                     askdirectory(initialdir='.')) / convert_name(
@@ -413,8 +436,11 @@ def guimode():
             fout = outputtext.get()
             output = runconversion(fin, fout)
             status.config(text=output)
+        except FileExistsError:
+            status.config(text=f"File {Path(fout).name} ALREADY EXISTS!")
         except Exception as e:
-            status.config(text=f"Error: {e}")
+            print(f"Error: {e}")
+            status.config(text=breakstr(f"Error: {e}"))
 
     gui.mainloop()
     p("Gui closed")
