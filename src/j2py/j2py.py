@@ -1,22 +1,18 @@
-# ## P2J - Python 2 Jupyter utility script
-# ## TODO LIST
+# ## J2Py - Python <=> Jupyter utility script
+# run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
 # ### j2py
-# - add options
 # - build shebangs from python version info
-# - improve matches
 # ### GUI
 # -   add icon
-# -   add options
 # -   add confirmation button if a file is going to be overwritten
 
-# run this script to convert easily and reversably scripts and notebooks, while keeping the formatted cells, comments and outputs
-# In[1]:
 import sys
 import re
 import random as rnd
 import json
 from copy import deepcopy
 from pathlib import Path
+from hashlib import md5
 
 TITLE = r"""
    ___  ______      
@@ -29,6 +25,15 @@ TITLE = r"""
               |___/ 
 """
 
+__all__ = [
+    'TITLE',
+    'OPTIONS',
+    'py2j',
+    'j2py',
+    'guimode',
+    'main',
+]
+
 
 class reg():
     """Store here all the regexes used in the script"""
@@ -38,8 +43,6 @@ class reg():
     simplecomment = r"# (.*)"
     scriptrow = r"^(\s*)(.+)$"
     start = r"(#.*!\/usr\/.*)|# coding.*|^$"
-    # arg_ext = r"--[\w\-]+"
-    # arg_short = r"-(\w+)"
 
 
 OPTIONS = {
@@ -126,10 +129,8 @@ def fixrow(s):
     if s[-1] != '\n':
         return s + '\n'
     return s
-    # return re.sub('\n*$', '\n', s) # not working always
 
 
-# In[3]:
 def py2j(dir_input: str, dir_output: str) -> str:
     p(dir_input, '->', dir_output)
     with open(dir_input) as py:
@@ -269,46 +270,11 @@ def breakstr(s, cols=45):
     return '\n'.join(s[i:i+cols] for i in range(0, len(s), cols))
 
 
-# def samedata(f0: str, f1: str) -> bool:
-#     """Checks the content of two strings, returning true if they are not updated"""
-#     h0 = md5(f0.encode()).hexdigest()
-#     h1 = md5(f1.encode()).hexdigest()
-#     return h0 == h1
-
-
-def demo(truename=False):
-    # TODO deprecate
-    py2j('j2py.py', 'j2py_demo.ipynb')
-    j2py('j2py_demo.ipynb', 'j2py_demo.py')
-    for i in range(50):
-        py2j('j2py_demo.py', 'j2py_demo.ipynb')
-        j2py('j2py_demo.ipynb', 'j2py_demo.py')
-
-
-def simplewindowselect():
-    # TODO deprecate
-    import tkinter as tk
-    from tkinter import ttk
-    from tkinter.filedialog import askopenfilename
-    from tkinter.simpledialog import askstring
-    # Store the path to the selected file
-    tk.Tk().withdraw()  # Do not show root window as tk
-    start_folder = Path('.')
-    startfile = askopenfilename(initialdir=start_folder)
-
-    if startfile == '':
-        p('You did not select any file.')
-        input('Press enter to close...')
-    else:
-        p('Source selected: ' + startfile)
-        outputfile = askstring(
-            "Output file name",
-            prompt=f"Select the name for the output file",
-            initialvalue=convert_name(startfile))
-        p(outputfile)
-        runconversion(startfile, outputfile)
-
-    p("Done")
+def samedata(f0: str, f1: str) -> bool:
+    """Checks the content of two strings, returning true if they are not updated"""
+    h0 = md5(f0.encode()).hexdigest()
+    h1 = md5(f1.encode()).hexdigest()
+    return h0 == h1
 
 
 def guimode():
@@ -440,9 +406,6 @@ def guimode():
     p("Gui closed")
 
 
-# In[4]:
-
-
 def print_help():
     print(TITLE)
     print("J2Py conversion utility")
@@ -471,8 +434,6 @@ def print_help():
     print("  --overwrite")
     print("\tWill OVERWRITE the destination file if already in the system")
     print("")
-
-# In[13]:
 
 
 def main():
